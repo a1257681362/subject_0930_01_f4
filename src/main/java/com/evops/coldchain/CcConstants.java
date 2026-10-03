@@ -58,10 +58,26 @@ public final class CcConstants {
     // 车载温度探头 / 校准凭证
     public static final String ENT_PROBE = "PROBE";
     public static final String ENT_CERT = "CERT";
+    // 分仓交接单 / 封签 / 权限开关
+    public static final String ENT_HANDOVER = "HANDOVER";
+    public static final String ENT_SEAL = "SEAL";
+    public static final String ENT_PERMISSION = "PERMISSION";
 
     // 校准凭证状态（VALID 有效 / VOID 作废；只追加 void* 字段，不删除原行）
     public static final String CERT_VALID = "VALID";
     public static final String CERT_VOID = "VOID";
+
+    // 分仓交接单状态（DRAFT 待逐封签核验 / SUBMITTED 已提交责任转移 / VOIDED 已作废留痕）
+    public static final String HANDOVER_DRAFT = "DRAFT";
+    public static final String HANDOVER_SUBMITTED = "SUBMITTED";
+    public static final String HANDOVER_VOIDED = "VOIDED";
+
+    // 封签核验状态（PENDING 待核验 / CONFIRMED 已核验；确认事实只进不退）
+    public static final String SEAL_PENDING = "PENDING";
+    public static final String SEAL_CONFIRMED = "CONFIRMED";
+
+    // 冷链药品运输（分仓交接）权限键：FALSE=权限收紧，交接停止推进，已确认封签事实保留
+    public static final String PERM_COLD_CHAIN_HANDOVER = "COLD_CHAIN_HANDOVER";
 
     // 操作动作
     public static final String ACT_CREATE = "CREATE";
@@ -86,4 +102,13 @@ public final class CcConstants {
     public static final String ACT_CERT_VOID = "CERT_VOID";
     public static final String ACT_PROBE_BIND = "PROBE_BIND";
     public static final String ACT_PROBE_REPLACE = "PROBE_REPLACE";
+    // 分仓交接：拆单建单 / 封签核验 / 提交责任转移 / 作废 / 权限收紧放行切换
+    public static final String ACT_HANDOVER_CREATE = "HANDOVER_CREATE";
+    public static final String ACT_SEAL_VERIFY = "SEAL_VERIFY";
+    public static final String ACT_HANDOVER_SUBMIT = "HANDOVER_SUBMIT";
+    public static final String ACT_HANDOVER_VOID = "HANDOVER_VOID";
+    public static final String ACT_PERMISSION_TIGHTEN = "PERMISSION_TIGHTEN";
+    public static final String ACT_PERMISSION_RESTORE = "PERMISSION_RESTORE";
+    // 一车货到达中转仓（交接前一个运输节点，登记到仓总箱数作为分箱平衡基准）
+    public static final String ACT_ARRIVE = "ARRIVE";
 }

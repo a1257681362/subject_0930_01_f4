@@ -1,9 +1,12 @@
 package com.evops.coldchain.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.evops.coldchain.CcConstants;
 import com.evops.coldchain.entity.Drug;
 import com.evops.coldchain.entity.ExceptionEvent;
 import com.evops.coldchain.entity.ExceptionEvidence;
+import com.evops.coldchain.entity.HandoverOrder;
+import com.evops.coldchain.entity.HandoverSeal;
 import com.evops.coldchain.entity.OpLog;
 import com.evops.coldchain.entity.Route;
 import com.evops.coldchain.entity.RouteSegmentSnap;
@@ -56,6 +59,10 @@ public class LedgerService {
     private TransportBatchService batchService;
     @Resource
     private RouteService routeService;
+    @Resource
+    private HandoverService handoverService;
+    @Resource
+    private PermissionService permissionService;
     @Resource
     private OpLogService opLogService;
 
@@ -130,6 +137,27 @@ public class LedgerService {
         }
         ledger.put("temperatures", temps);
         ledger.put("exceptions", exceptionList);
+
+        // 分仓交接（V4）：到仓箱数/责任主体/交接进度 + 每张交接单及其封签核验明细。
+        // 原运输批次借此可追溯全部分仓节点，责任主体随交接提交转移。
+        List<HandoverOrder> handovers = handoverService.listByBatch(batchId);
+        List<Map<String, Object>> handoverList = new ArrayList<>();
+        for (HandoverOrder ho : handovers) {
+            List<HandoverSeal> seals = handoverService.listSeals(ho.getId());
+            Map<String, Object> hm = new LinkedHashMap<>();
+            hm.put("order", ho);
+            hm.put("seals", seals);
+            handoverList.add(hm);
+        }
+        Map<String, Object> handoverInfo = new LinkedHashMap<>();
+        handoverInfo.put("arrivedBoxQty", batch.getArrivedBoxQty());
+        handoverInfo.put("responsibleOrg", batch.getResponsibleOrg());
+        handoverInfo.put("responsibleParty", batch.getResponsibleParty());
+        handoverInfo.put("progress", handoverService.progress(batchId));
+        handoverInfo.put("handovers", handoverList);
+        handoverInfo.put("coldChainPermissionPermitted",
+                permissionService.isPermitted(CcConstants.PERM_COLD_CHAIN_HANDOVER));
+        ledger.put("handovers", handoverInfo);
         ledger.put("opLogs", opLogs);
         return ledger;
     }

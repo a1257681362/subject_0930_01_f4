@@ -419,9 +419,11 @@ class RouteTemperatureSegmentIntegrationTest {
                 segment(0, 50, 2, 8, 30, "通甲"), segment(50, 100, 0, 5, 60, "通乙")), null);
         publishVersion(generalId);
 
-        // 秋季时点：命中当季 AUTUMN，而非 GENERAL
+        // 秋季时点：命中当季 AUTUMN，而非 GENERAL。
+        // 两版本均为“发布即长期生效”（生效起点为运行当天），故查询点取未来的秋季日期，
+        // 避免使用早于运行当天的固定日期（如 2026-10-01）导致在 10 月运行时命中不到。
         assertEquals(autumnId,
-                routeService.selectEffectiveAt(routeId, LocalDateTime.of(2026, 10, 1, 8, 0)).getId());
+                routeService.selectEffectiveAt(routeId, LocalDateTime.of(2027, 10, 15, 8, 0)).getId());
         // 冬季/夏季（未配置）：回退 GENERAL
         assertEquals(generalId,
                 routeService.selectEffectiveAt(routeId, LocalDateTime.of(2027, 1, 20, 8, 0)).getId());

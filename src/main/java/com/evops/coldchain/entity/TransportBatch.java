@@ -55,6 +55,14 @@ public class TransportBatch extends BaseEntity {
     private LocalDateTime probeValidUntilSnap;
     private String probeSha256Snap;
 
+    // —— V4 分仓交接：到仓总箱数（分箱平衡基准）与当前责任主体（随交接提交转移）——
+    /** 一车货到达中转仓时登记的到仓总箱数；全部交接单箱数合计必须与之平衡 */
+    private Integer arrivedBoxQty;
+    /** 当前责任主体机构：发运时为承运商，交接提交后随单转移为接收方 */
+    private String responsibleOrg;
+    /** 当前责任主体（驾驶员/接收人等具体责任人） */
+    private String responsibleParty;
+
     public String getBatchNo() { return batchNo; }
     public void setBatchNo(String batchNo) { this.batchNo = batchNo; }
     public Long getOrderId() { return orderId; }
@@ -119,4 +127,10 @@ public class TransportBatch extends BaseEntity {
     public void setProbeValidUntilSnap(LocalDateTime probeValidUntilSnap) { this.probeValidUntilSnap = probeValidUntilSnap; }
     public String getProbeSha256Snap() { return probeSha256Snap; }
     public void setProbeSha256Snap(String probeSha256Snap) { this.probeSha256Snap = probeSha256Snap; }
+    public Integer getArrivedBoxQty() { return arrivedBoxQty; }
+    public void setArrivedBoxQty(Integer arrivedBoxQty) { this.arrivedBoxQty = arrivedBoxQty; }
+    public String getResponsibleOrg() { return responsibleOrg; }
+    public void setResponsibleOrg(String responsibleOrg) { this.responsibleOrg = responsibleOrg; }
+    public String getResponsibleParty() { return responsibleParty; }
+    public void setResponsibleParty(String responsibleParty) { this.responsibleParty = responsibleParty; }
 }

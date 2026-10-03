@@ -70,6 +70,10 @@ public class TransportBatchService {
     @Resource
     private ProbeService probeService;
     @Resource
+    private HandoverService handoverService;
+    @Resource
+    private PermissionService permissionService;
+    @Resource
     private OpLogService opLogService;
 
     /** 派车：生成稳定批次号，固化档案快照，关联发货单与车辆 */
@@ -135,6 +139,8 @@ public class TransportBatchService {
 
         // 发运前卡口：车辆必须绑定仍在有效期内的持证探头（接口与页面共用这一道校验）
         VehicleProbe probeBinding = probeService.requireValidBindingForShip(batch.getVehicleId());
+        // 当前责任主体初始为承运方（驾驶员/车辆）；后续分仓交接提交后随单转移给接收方
+        Vehicle carrier = vehicleService.requireActiveVehicle(batch.getVehicleId());
 
         int snapCount = 0;
         RouteVersion routeVersion = null;
@@ -160,6 +166,10 @@ public class TransportBatchService {
         batch.setProbeCertNoSnap(probeBinding.getCertNoSnap());
         batch.setProbeValidUntilSnap(probeBinding.getValidUntilSnap());
         batch.setProbeSha256Snap(probeBinding.getSha256Snap());
+
+        // 责任主体起点：承运商（机构）+ 驾驶员（具体责任人）；分仓交接提交后随单转移
+        batch.setResponsibleOrg(carrier.getCarrierName());
+        batch.setResponsibleParty(carrier.getDriverName() == null ? carrier.getPlateNo() : carrier.getDriverName());
 
         batch.setStatus(CcConstants.BATCH_SHIPPED);
         batch.setShipTime(LocalDateTime.now());
@@ -409,6 +419,12 @@ public class TransportBatchService {
             throw new BusinessException("批次已签收，不能重复签收");
         }
 
+        // 冷链药品运输权限被收紧时，交接/继续派送停止推进（已确认的封签核验事实保留）
+        permissionService.requirePermitted(CcConstants.PERM_COLD_CHAIN_HANDOVER);
+        // 已进入分仓交接流程的批次：全部箱子封签核验完成、箱数平衡后方可继续派送/签收；
+        // 未走中转仓拆分的直发批次（未登记到仓箱数）不经过此卡口。
+        handoverService.requireReadyForDispatchIfStarted(batch.getId());
+
         // 1) 实物与快照核对（按原版本）
         if (!batch.getApprovalNoSnap().equals(req.getReceivedApprovalNo())) {
             throw new BusinessException(String.format(
@@ -445,10 +461,13 @@ public class TransportBatchService {
         orderMapper.updateById(order);
 
         opLogService.log(CcConstants.ENT_BATCH, batch.getId(), batch.getId(), CcConstants.ACT_SIGN,
-                String.format("批次 %s 由 %s 签收闭环：按原档案 V%d 快照核对一致（批准文号=%s，包装=%s，数量=%d）%s",
+                String.format("批次 %s 由 %s 签收闭环：按原档案 V%d 快照核对一致（批准文号=%s，包装=%s，数量=%d）%s；闭环时责任主体=%s/%s%s",
                         batch.getBatchNo(), req.getSignBy(), batch.getDrugVersionNo(),
                         batch.getApprovalNoSnap(), batch.getPackageSpecSnap(), batch.getShipQty(),
-                        Boolean.TRUE.equals(batch.getHasTempExcursion()) ? "；途中曾越限（异常均已处理）" : ""));
+                        Boolean.TRUE.equals(batch.getHasTempExcursion()) ? "；途中曾越限（异常均已处理）" : "",
+                        batch.getResponsibleOrg() == null ? "原承运方" : batch.getResponsibleOrg(),
+                        batch.getResponsibleParty() == null ? "" : batch.getResponsibleParty(),
+                        batch.getArrivedBoxQty() == null ? "" : "；分仓交接全部封签核验通过、箱数平衡"));
         return batch;
     }
 
