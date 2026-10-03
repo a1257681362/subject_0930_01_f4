@@ -28,6 +28,8 @@ public class TransportBatch extends BaseEntity {
     // —— 运输信息 ——
     private String receiverOrg;
     private Integer shipQty;
+    /** 总箱数（派车时固化，分仓拆单箱数平衡基准；不拆仓交接的批次为空） */
+    private Integer totalBoxes;
     private LocalDateTime dispatchTime;
     private LocalDateTime shipTime;
     private LocalDateTime signTime;
@@ -77,6 +79,8 @@ public class TransportBatch extends BaseEntity {
     public void setReceiverOrg(String receiverOrg) { this.receiverOrg = receiverOrg; }
     public Integer getShipQty() { return shipQty; }
     public void setShipQty(Integer shipQty) { this.shipQty = shipQty; }
+    public Integer getTotalBoxes() { return totalBoxes; }
+    public void setTotalBoxes(Integer totalBoxes) { this.totalBoxes = totalBoxes; }
     public LocalDateTime getDispatchTime() { return dispatchTime; }
     public void setDispatchTime(LocalDateTime dispatchTime) { this.dispatchTime = dispatchTime; }
     public LocalDateTime getShipTime() { return shipTime; }

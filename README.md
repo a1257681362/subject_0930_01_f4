@@ -215,3 +215,84 @@ curl -u dispatcher:dispatcher123 -H 'Content-Type: application/json' \
 覆盖发运前未绑定/证书过期/证书作废拦截、绑定过期设备拦截、替换链前后关系、
 在途批次历史温度不回写（新批次归新探头）、SHA-256 摘要确定性、下载/作废逐次留痕、
 同 requestId 换参数拒绝，以及管理页面过期探头禁选与待发运批次拦截提示。
+
+## 冷链运输 V4：批次分仓交接
+
+在 V1–V3 台账上增加“一车货到达中转仓后的分仓交接”。一个在途运输批次可按箱拆成多个交接单，
+每单记录**箱数、封签号、交接温度、接收人**；封签逐单核验（事实只追加），未完成核验的箱子
+不能完成交接、不能继续派送；交接完成后责任主体随单转移，原运输批次仍能追溯派车/发运/温度/
+交接全部节点。冷链药品运输权限可一键收紧，收紧后交接停止推进，已经确认的封签核验事实保留。
+
+### 核心规则
+
+- **派车登记总箱数**：`POST /batches/dispatch` 新增可选 `totalBoxes`，派车时固化为分仓拆单的
+  箱数平衡基准；不做分仓交接的既有批次不受影响。
+- **一车多单拆分，强校验后才落库**：拆单一次性提交多个交接单，整单事务，任一不满足全部拒绝，
+  并在 message 中给出**具体原因**：
+  - **箱数不平**：各单箱数合计必须恰好等于批次总箱数，提示合计/总箱数/差额（超出或不足）；
+  - **封签重复**：封签号在本批次内唯一（数据库唯一索引兜底），提示重复的封签号；
+  - **温度缺失/接收人缺失**：每单交接温度、接收人必填；
+  - 同一批次只允许拆一次（防止重复拆单导致重箱），未发运/已签收/已撤回批次不可拆单。
+- **封签核验只追加**：`t_cc_handover_seal_verify` 每核验一次新增一行（MATCH 相符 / MISMATCH
+  不符），记录封签号、确认箱数、核验人与时间，应用层只有 INSERT；勾选相符但核验箱数与声明
+  箱数不一致时按 MISMATCH 留痕并注明差额。卡口以“最近一次核验结论”为准，历史核验行全部保留。
+- **未核验不放行**：交接单须最近一次封签核验 MATCH 才能完成交接；完成交接（责任随单转移）后
+  才能放行下游派送，`deliver` 接口对“未核验/核验不符/未完成交接”再次卡口。
+- **责任主体随单转移**：完成交接瞬间把接收仓与接收人快照到交接单 `handover_owner_org/name`
+  与 `handover_time`；原承运责任止于交接，原运输批次、温度、异常与交接核验记录全部保留，
+  `GET /batches/{id}/ledger` 聚合交接单与封签核验，全链路节点仍可追溯。
+- **权限收紧停止推进、已确认事实保留**：`t_cc_policy` 单行策略（cold-chain-transport）
+  ENABLED/RESTRICTED。收紧后拆单、封签核验、完成交接、放行派送一律拒绝并回带**收紧原因**；
+  查询不受影响，交接单与已确认（MATCH）的核验行原样保留，不回滚、不删除。放开后可凭收紧前
+  已确认的封签事实直接继续推进。
+- **撤回连带处理**：批次撤回时，尚未完成交接（责任未转移）的交接单置 `ABANDONED`；
+  已 COMPLETED 的责任主体已随单转移，状态不动；任何封签核验事实都不删除。
+- 拆单/封签核验/交接完成/放行派送/连带放弃/权限收紧与放开均写 `t_cc_op_log`（实体类型
+  `HANDOVER` / `POLICY`），按批次可串联。
+
+### 表结构增量（详见 schema.sql，版本标记 `cold-chain-4`）
+
+- 新增 `t_cc_handover_order`（分仓交接单，含箱数/封签/交接温度/接收人/责任转移主体/放行标记）、
+  `t_cc_handover_seal_verify`（封签核验事实，只追加）、`t_cc_policy`（冷链权限单行开关，
+  种入默认 ENABLED 行）、序列 `seq_cc_handover_no`（交接单号 `JJ+8位`）。
+- `t_cc_transport_batch` 增 `total_boxes`（派车固化的总箱数）。
+
+### 接口增量（仍在 `/api/cold-chain` 下，HTTP Basic）
+
+| 动作 | 方法与路径 |
+| --- | --- |
+| 分仓拆单（一车多单，强校验具体原因） | `POST /handovers/split` |
+| 封签核验（MATCH/MISMATCH 事实只追加） | `POST /handovers/seal-verifications` |
+| 完成交接（责任主体随单转移） | `POST /handovers/{id}/complete` |
+| 放行下游派送（未核验不放行） | `POST /handovers/{id}/deliver` |
+| 交接单详情（含全部核验事实） | `GET /handovers/{id}` |
+| 按批次查交接单 / 按单查核验流水 | `GET /handovers/batch/{batchId}` / `GET /handovers/{id}/seal-verifications` |
+| 查看冷链运输权限 | `GET /policy` |
+| 收紧 / 放开冷链运输权限 | `POST /policy/restrict` / `POST /policy/enable`（body：`{"reason":"..."}`） |
+
+示例（50 箱拆 30+20 两单）：
+
+```bash
+curl -u dispatcher:dispatcher123 -H 'Content-Type: application/json' \
+  -X POST http://localhost:8080/api/cold-chain/handovers/split \
+  -d '{"batchId":1,"warehouseName":"杭州中转仓",
+       "items":[
+         {"boxQty":30,"sealNo":"SEAL-0001","handoverTemperature":5.10,"receiverName":"王仓管"},
+         {"boxQty":20,"sealNo":"SEAL-0002","handoverTemperature":4.80,"receiverName":"李分拣"}]}'
+
+curl -u dispatcher:dispatcher123 -H 'Content-Type: application/json' \
+  -X POST http://localhost:8080/api/cold-chain/handovers/seal-verifications \
+  -d '{"handoverId":1,"match":true}'
+
+curl -u dispatcher:dispatcher123 -X POST http://localhost:8080/api/cold-chain/policy/restrict \
+  -H 'Content-Type: application/json' -d '{"reason":"监管飞检整改，暂停冷链交接"}'
+```
+
+### V4 验收
+
+`HandoverSplitIntegrationTest` 以真实 HTTP 入口（TestRestTemplate + Basic 认证）驱动，
+再用 Mapper 直查物理表，覆盖：一车两单拆分落库且箱数平衡、箱数不平（含差额方向）/封签重复/
+温度与接收人缺失返回具体原因且整单回滚无新增行、未核验不能交接与派送、封签核验只追加
+（不符→箱数不符→相符多行并存）、交接完成责任主体随单转移且批次台账聚合全部交接节点、
+权限收紧后拆单/核验/交接/放行全部停止并回带原因而已确认事实保留、放开后凭已确认事实继续、
+批次撤回连带放弃未交接单但已交接单与核验事实不动。

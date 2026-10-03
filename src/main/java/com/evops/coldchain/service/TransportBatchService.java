@@ -70,6 +70,8 @@ public class TransportBatchService {
     @Resource
     private ProbeService probeService;
     @Resource
+    private HandoverService handoverService;
+    @Resource
     private OpLogService opLogService;
 
     /** 派车：生成稳定批次号，固化档案快照，关联发货单与车辆 */
@@ -106,6 +108,8 @@ public class TransportBatchService {
         // 运输信息
         batch.setReceiverOrg(order.getReceiverOrg());
         batch.setShipQty(order.getShipQty());
+        // 总箱数派车时固化：分仓交接拆单的箱数平衡基准（不传表示该批不做分仓交接）
+        batch.setTotalBoxes(req.getTotalBoxes());
         batch.setDispatchTime(LocalDateTime.now());
         batch.setHasTempExcursion(false);
         batch.setStatus(CcConstants.BATCH_DISPATCHED);
@@ -473,6 +477,10 @@ public class TransportBatchService {
             order.setStatus(CcConstants.ORDER_REVOKED);
             orderMapper.updateById(order);
         }
+
+        // 分仓交接连带处理：未完成交接（责任未转移）的交接单置 ABANDONED；
+        // 已完成交接的责任主体已随单转移，保持不变。封签核验事实一律保留。
+        handoverService.abandonForBatch(batch);
 
         opLogService.log(CcConstants.ENT_BATCH, batch.getId(), batch.getId(), CcConstants.ACT_REVOKE,
                 "批次 " + batch.getBatchNo() + " 撤回作废（原始记录全部保留）。原因：" + req.getReason());

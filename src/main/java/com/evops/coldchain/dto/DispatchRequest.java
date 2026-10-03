@@ -1,6 +1,7 @@
 package com.evops.coldchain.dto;
 
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Positive;
 
 /** 派车请求：发货单 + 承运车辆，生成运输批次并固化档案快照 */
 public class DispatchRequest {
@@ -13,6 +14,12 @@ public class DispatchRequest {
      * 不传则保持 V1 全程单一档案温区口径。
      */
     private Long routeId;
+    /**
+     * 可选总箱数：派车时固化，作为到达中转仓后分仓拆单的箱数平衡基准。
+     * 不拆仓交接的既有批次可不传；一旦要做分仓交接则必须在派车时登记。
+     */
+    @Positive(message = "总箱数必须大于0")
+    private Integer totalBoxes;
 
     public Long getOrderId() { return orderId; }
     public void setOrderId(Long orderId) { this.orderId = orderId; }
@@ -20,4 +27,6 @@ public class DispatchRequest {
     public void setVehicleId(Long vehicleId) { this.vehicleId = vehicleId; }
     public Long getRouteId() { return routeId; }
     public void setRouteId(Long routeId) { this.routeId = routeId; }
+    public Integer getTotalBoxes() { return totalBoxes; }
+    public void setTotalBoxes(Integer totalBoxes) { this.totalBoxes = totalBoxes; }
 }

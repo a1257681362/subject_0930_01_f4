@@ -58,10 +58,28 @@ public final class CcConstants {
     // 车载温度探头 / 校准凭证
     public static final String ENT_PROBE = "PROBE";
     public static final String ENT_CERT = "CERT";
+    // 分仓交接单 / 封签核验 / 权限策略
+    public static final String ENT_HANDOVER = "HANDOVER";
+    public static final String ENT_POLICY = "POLICY";
 
     // 校准凭证状态（VALID 有效 / VOID 作废；只追加 void* 字段，不删除原行）
     public static final String CERT_VALID = "VALID";
     public static final String CERT_VOID = "VOID";
+
+    // 分仓交接单状态（PENDING 待封签核验 / SEAL_VERIFIED 已核验待交接 / COMPLETED 责任已转移 / ABANDONED 连带放弃）
+    public static final String HANDOVER_PENDING = "PENDING";
+    public static final String HANDOVER_SEAL_VERIFIED = "SEAL_VERIFIED";
+    public static final String HANDOVER_COMPLETED = "COMPLETED";
+    public static final String HANDOVER_ABANDONED = "ABANDONED";
+
+    // 封签核验结论（只追加事实：MATCH 相符已确认 / MISMATCH 不符）
+    public static final String SEAL_MATCH = "MATCH";
+    public static final String SEAL_MISMATCH = "MISMATCH";
+
+    // 冷链药品运输权限策略（ENABLED 放开 / RESTRICTED 收紧——分仓交接停止推进，已确认事实保留）
+    public static final String POLICY_KEY_COLD_CHAIN = "cold-chain-transport";
+    public static final String POLICY_ENABLED = "ENABLED";
+    public static final String POLICY_RESTRICTED = "RESTRICTED";
 
     // 操作动作
     public static final String ACT_CREATE = "CREATE";
@@ -86,4 +104,13 @@ public final class CcConstants {
     public static final String ACT_CERT_VOID = "CERT_VOID";
     public static final String ACT_PROBE_BIND = "PROBE_BIND";
     public static final String ACT_PROBE_REPLACE = "PROBE_REPLACE";
+    // 分仓交接：拆单提交 / 封签核验（只追加事实）/ 交接完成责任转移 / 放行派送 / 批次撤回连带放弃
+    public static final String ACT_HANDOVER_SPLIT = "HANDOVER_SPLIT";
+    public static final String ACT_SEAL_VERIFY = "SEAL_VERIFY";
+    public static final String ACT_HANDOVER_COMPLETE = "HANDOVER_COMPLETE";
+    public static final String ACT_HANDOVER_DELIVER = "HANDOVER_DELIVER";
+    public static final String ACT_HANDOVER_ABANDON = "HANDOVER_ABANDON";
+    // 冷链药品运输权限收紧 / 放开
+    public static final String ACT_POLICY_RESTRICT = "POLICY_RESTRICT";
+    public static final String ACT_POLICY_ENABLE = "POLICY_ENABLE";
 }

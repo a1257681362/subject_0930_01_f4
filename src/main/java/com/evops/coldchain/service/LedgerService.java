@@ -1,6 +1,7 @@
 package com.evops.coldchain.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.evops.coldchain.CcConstants;
 import com.evops.coldchain.entity.Drug;
 import com.evops.coldchain.entity.ExceptionEvent;
 import com.evops.coldchain.entity.ExceptionEvidence;
@@ -56,6 +57,8 @@ public class LedgerService {
     private TransportBatchService batchService;
     @Resource
     private RouteService routeService;
+    @Resource
+    private HandoverService handoverService;
     @Resource
     private OpLogService opLogService;
 
@@ -130,6 +133,29 @@ public class LedgerService {
         }
         ledger.put("temperatures", temps);
         ledger.put("exceptions", exceptionList);
+
+        // 分仓交接节点：交接单（责任主体随单转移）+ 每单只追加的封签核验事实，
+        // 原运输批次台账仍能串起派车/发运/温度/交接全部节点
+        List<com.evops.coldchain.entity.HandoverOrder> handovers = handoverService.listByBatch(batchId);
+        List<Map<String, Object>> handoverList = new ArrayList<>();
+        int handedBoxes = 0;
+        for (com.evops.coldchain.entity.HandoverOrder ho : handovers) {
+            Map<String, Object> hm = new LinkedHashMap<>();
+            hm.put("handover", ho);
+            hm.put("sealVerifies", handoverService.listVerifies(ho.getId()));
+            handoverList.add(hm);
+            if (CcConstants.HANDOVER_COMPLETED.equals(ho.getStatus())) {
+                handedBoxes += ho.getBoxQty();
+            }
+        }
+        if (!handovers.isEmpty()) {
+            Map<String, Object> handoverInfo = new LinkedHashMap<>();
+            handoverInfo.put("totalBoxes", batch.getTotalBoxes());
+            handoverInfo.put("orders", handoverList);
+            handoverInfo.put("completedBoxes", handedBoxes);
+            ledger.put("handovers", handoverInfo);
+        }
+
         ledger.put("opLogs", opLogs);
         return ledger;
     }
